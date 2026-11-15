@@ -1,0 +1,27 @@
+name: trading_gp
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.10
+
+  # 資料處理
+  - numpy
+  - pandas
+  - pyyaml
+
+  # 遺傳規劃
+  - deap
+
+  # 統計 (multi_run_manager 的 Mann-Whitney U 檢定)
+  - scipy
+
+  # 公式化簡 (src/tree_simplifier.py)
+  - sympy
+
+  # 視覺化 (報告與 strategy_analyzer)
+  - plotly
+  - matplotlib
+  - networkx    # 語法樹的節點結構
+  - pydot       # 語法樹排版
+  - graphviz    # pydot 使用的排版引擎

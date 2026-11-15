@@ -1,0 +1,42 @@
+# ===== Python =====
+__pycache__/
+*.py[codz]
+*$py.class
+*.egg-info/
+build/
+dist/
+
+# ===== Environments =====
+.env
+.envrc
+.venv
+env/
+venv/
+
+# ===== Tool caches =====
+.ipynb_checkpoints
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# ===== OS / editor =====
+.DS_Store
+._*
+.vscode/
+.idea/
+
+# ===== Data (not redistributed; see README for how to build it) =====
+data/*
+!data/README.md
+
+# ===== Experiment outputs =====
+checkpoints/*
+!checkpoints/.gitkeep
+gp_experiment_studies/
+
+# Generated files anywhere in the tree (models, data, plots, HTML reports)
+*.pkl
+*.csv
+*.png
+*.html
+*.log

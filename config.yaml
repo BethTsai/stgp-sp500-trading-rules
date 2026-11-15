@@ -1,0 +1,116 @@
+system:
+  checkpoint_dir: "checkpoints"   # 單次執行 main.py 時的輸出目錄；multi_run_manager 會為每個 run 另外指定
+  seed: 42                # multi_run_manager 中第 i 個 run 使用 seed + i
+
+data:
+  # 特徵檔 (由 data_pipeline/features_pit.py 產生)：
+  #   data/processed/features_stage27.pkl   27 檔股票池
+  #   data/processed/features_stage55.pkl   55 檔股票池
+  file_path: "data/processed/features_stage27.pkl"
+
+  # 沒有 Validation 的 regular 模式 (soo_training_mode: "regular") 使用的期間
+  train_start: "2018-07-01"
+  train_end: "2022-06-30"
+  test_start: "2022-07-01"
+  test_end: "2023-12-31"
+
+  # oos 模式使用的 Train / Val / Test 期間；rolling_multi_run.py 會為每個 Test 年自動改寫這 6 個日期
+  oos_split:
+    train_start: "2014-01-01"
+    train_end: "2017-12-31"
+    val_start: "2018-01-01"
+    val_end: "2018-12-31"
+    test_start: "2019-01-01"
+    test_end: "2019-12-31"
+
+  train_symbols: all      # all = pkl 內全部股票 (成分股加入 / 剔除由 pkl 的 active 矩陣處理)；也可寫代號 list
+  test_only_symbols: [    # 僅在 Test 期加入的股票 (通常留空)
+  ]
+
+rsfgp:
+  window_mode: "calendar_half"   # "calendar_half": 依日曆半年 (1~6 月、7~12 月) 切窗口 | "bars": 每 window_bars 根切分 (不足一個窗口的尾段捨棄)
+  window_bars: 756               # bars 模式的窗口長度 (約半年)；calendar_half 模式只用來警告「不足半年」的窗口
+  num_samples: null              # null = 使用全部窗口；整數 = 每次隨機抽取的窗口數
+
+evolution:
+  pop_size: 2000           # μ
+  offspring_size: 2000     # λ
+
+  max_gen: 500             # 最大世代數
+  max_depth: 6             # 語法樹最大深度
+
+  cxpb: 0.5                # 交配機率
+  mutpb: 0.5               # 突變機率
+  tournsize: 3             # 錦標賽選擇大小
+
+  init_min: 2              # 初始樹深度範圍 (ramped half-and-half)
+  init_max: 6
+
+  # --- Validation 與 Early Stopping ---
+  early_stopping_patience: 100   # 連續 N 代 Validation 分數未創新高即停止
+  val_top_n: 20                  # 每代將 Train 前 N 名不重複個體送至 Validation 評估
+  champion_rule: "val"           # "val": 冠軍 = Val 最高；"min_train_val": 冠軍 = min(Train, Val) 最高
+
+  # --- 存活選擇去重 ---
+  dedup_survival: true     # 合併父代與子代後去除重複個體
+  dedup_const_round: 2     # 以結構判重時，常數四捨五入到小數第幾位
+  dedup_by_fitness: true   # true: 適應度相同 (小數 6 位) 即視為重複
+  immigrant_rate: 0.05     # 每代加入的隨機新個體比例 (相對於 μ)
+
+  # --- 單 / 多目標 ---
+  objective_mode: "single"         # "single" (單目標) | "multi" (多目標)
+  soo_training_mode: "oos"         # 單目標："oos" (使用 oos_split，含 Validation) | "regular"
+  weights: [1.0]                   # 單目標 [1.0]；多目標 [1.0, 1.0]
+  multi_target: "skewness"         # 多目標且沒有 moo 區塊時的第二目標："skewness" | "payoff"
+  moo_selection_method: "oos"      # 多目標挑代表策略的方式："oos" | "topsis" | "knee_point"
+
+features:
+  erc_range: [-100.0, 100.0]       # 目前未使用 (常數範圍固定為 Rank [0,1]、Ratio [-1,1])
+  enforce_unit_scale: true         # 檢查所有特徵都在 [0, 1]，否則報錯
+  selected_features_exact: [       # 使用的特徵 (空 = pkl 內全部特徵)
+    # 市場模型 (日線，延遲一日)
+    'Rank_alpha20', 'Rank_alpha60', 'Rank_beta60',
+    # 短期反轉
+    'Rank_ROC1', 'IBS3', 'Rank_Bias_EMA6',
+    # 動能
+    'Rank_ROC30', 'Rank_ROC240', 'Rank_ROC720',
+    # 波動度
+    'Rank_HV30', 'Rank_HV240',
+    # 成交量
+    'Rank_RelVol20',
+    # 大盤狀態
+    'Rank_Mkt_Trend', 'Rank_Mkt_Vol', 'Rank_Mkt_Breadth'
+  ]
+
+trading:
+  bars_per_year: 1512              # 65 分鐘 K 棒：252 天 × 6 根
+  initial_capital: 100000.0        # 繪製資金曲線的初始資金
+  transaction_fee: 0.001           # 每邊 0.1%
+  allocation_mode: "dynamic"       # "dynamic": 持有的股票等權 | "fixed": 每檔固定 1/N
+  fee_mode: "drift"                # "drift": 只在持股組合改變時調回等權並收費，其餘時間權重隨價格飄移
+                                   # "rebalanced": 每根 K 棒調回等權並收費 | "signal_driven": 每根調回等權但只在訊號改變時收費
+
+fitness:
+  return_mode: "simple"            # 窗口報酬："simple" (期末淨值 - 1) | "log"
+  aggregation: "mean_downside"     # "mean_downside": 平均 - std_k × 下方標準差 | "mean_std" | "mean" | "median" | "min" | "quantile"
+  std_k: 0.5
+  downside_target: "mean"          # 下方標準差的門檻："mean" 或數字
+  quantile: 0.25                   # aggregation = "quantile" 時使用
+  score_clip: 10.0                 # 窗口分數限制在 [-10, 10]
+  relative_to_baseline: true       # true: 窗口分數 = 策略分數 − 同窗口 B&H 分數
+  baseline: "bh"                   # "bh": Buy-and-Hold | "ew_same": 全部持有，使用相同交易模式
+  min_turnover: 4.0                # 窗口累計換手量低於此值 -> 無效窗口 (幾乎不交易)
+  max_long_ratio: 0.95             # 平均持倉比例高於此值 -> 無效窗口 (幾乎永遠持有)
+  min_long_ratio: 0.1              # 平均持倉比例低於此值 -> 無效窗口；報告主設定 0.1，另以 0.2 做穩健性比較
+  length_penalty: 0.002            # 每個節點的懲罰 (抑制 bloat)
+  turnover_penalty: 0.0            # 每單位平均換手的懲罰
+
+# 以下只在 objective_mode: "multi" 時使用
+moo:
+  scheme: "robust"              # robust (B) | complexity (A) | turnover (C) | sterling_split (D) | skewness (E) | payoff (F)
+  robust_second: "std"          # scheme = robust：第二目標 "std" (-標準差) | "min" (最差窗口分數)
+  degenerate_window_frac: 1.0   # 無效窗口比例 >= 此值，兩個目標都給最差值
+  length_penalty: 0.0           # 只扣在第一目標；scheme = complexity 時忽略
+  turnover_ref: 300.0           # scheme = turnover：換手量上限 / 最差值
+  skew_cap: 3.0                 # scheme = skewness：偏度限制在 [-cap, cap]
+  payoff_cap: 5.0               # scheme = payoff：盈虧比限制在 [0, cap]
